@@ -1,237 +1,200 @@
-import os
+from flask import Flask, render_template, Response, request, jsonify
 import cv2
-import time
-import logging
-from pathlib import Path
-from typing import Optional
 import threading
-import argparse
+import time
+import numpy as np
+from detection import WildlifeDetector
+from alert import EmailAlertSystem
 
-from yolov9 import YOLOv9
-from config import DetectionConfig
-from raspberry_utils import RaspberryPiMonitor
-from motion_detector import MotionDetector
-from web_interface import init_web_interface, web_interface
-from alert_system import AlertSystem
-from mobile_api import init_mobile_api, mobile_api_instance
-from analytics import Analytics
+app = Flask(__name__)
 
-def setup_logging(config: DetectionConfig):
-    """Setup logging configuration."""
-    logging.basicConfig(
-        level=getattr(logging, config.log_level),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(f"logs/{config.log_file}"),
-            logging.StreamHandler()
-        ]
-    )
+# Initialize components
+detector = WildlifeDetector()
+alert_system = EmailAlertSystem()
 
-def get_detector(config: DetectionConfig) -> YOLOv9:
-    """Initialize the YOLOv9 detector."""
-    weights_path = config.weights_path
-    classes_path = config.classes_path
-    
-    assert os.path.isfile(weights_path), f"There's no weight file with name {weights_path}"
-    assert os.path.isfile(classes_path), f"There's no classes file with name {classes_path}"
-    
-    detector = YOLOv9(
-        model_path=weights_path,
-        class_mapping_path=classes_path,
-        score_threshold=config.score_threshold,
-        conf_thresold=config.conf_threshold,
-        iou_threshold=config.iou_threshold,
-        device=config.device
-    )
-    return detector
+# Global variables with proper initialization
+current_frame = None
+frame_lock = threading.Lock()
+user_email = None
+current_source = None  # 'webcam' or 'video'
+cap = None
+video_path = None
+stop_event = threading.Event()
+detection_results = []
 
-def process_video(config: DetectionConfig):
-    """Process video stream with all features enabled."""
-    logging.info("Starting video processing")
-    
-    # Initialize components
-    detector = get_detector(config)
-    monitor = RaspberryPiMonitor(config)
-    motion_detector = MotionDetector(config)
-    alert_system = AlertSystem(config)
-    analytics = Analytics(config)
-    
-    # Initialize web interface if enabled
-    web_thread = None
-    if config.enable_web_interface:
-        try:
-            logging.info("Initializing web interface")
-            if init_web_interface(config):
-                if web_interface is not None:  # Check if web_interface was created
-                    web_thread = threading.Thread(target=web_interface.run)
-                    web_thread.daemon = True
-                    web_thread.start()
-                    logging.info(f"Web interface started on http://{config.web_host}:{config.web_port}")
-                    # Wait a moment for the web interface to start
-                    time.sleep(1)
-                else:
-                    logging.error("Web interface instance is None")
-            else:
-                logging.warning("Web interface initialization failed, continuing without web interface")
-        except Exception as e:
-            logging.error(f"Failed to initialize web interface: {str(e)}")
-    
-    # Open video capture
-    if config.video_path:
-        logging.info(f"Opening video file: {config.video_path}")
-        cap = cv2.VideoCapture(config.video_path)
-        if not cap.isOpened():
-            raise ValueError(f"Could not open video file: {config.video_path}")
-    else:
-        logging.info("Opening webcam")
-        cap = cv2.VideoCapture(0)  # Use default webcam (0)
-        if not cap.isOpened():
-            raise ValueError("Could not open webcam")
-    
-    # Set video properties for better performance
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_FPS, 30)
-    
-    # Get video properties
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    logging.info(f"Video properties: {width}x{height} @ {fps}fps")
-    if total_frames > 0:
-        logging.info(f"Total frames: {total_frames}")
-    
-    # Initialize video writer if recording is enabled
-    writer = None
-    if config.enable_recording:
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        recording_path = f"{config.recording_path}/recording_{int(time.time())}.mp4"
-        writer = cv2.VideoWriter(recording_path, fourcc, 20.0, (width, height))
-        logging.info(f"Recording enabled: {recording_path}")
-    
-    frame_idx = 0
-    start_time = time.time()
-    detection_count = 0
-    
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                if config.video_path:
-                    logging.info("End of video reached")
-                else:
-                    logging.error("Failed to grab frame from webcam")
-                break
-                
-            frame_idx += 1
-            
-            # Perform object detection on every frame
-            detections = detector.detect(frame)
-            if detections:
-                detection_count += 1
-                logging.info(f"Frame {frame_idx}: Found {len(detections)} objects")
-                detector.draw_detections(frame, detections=detections)
-                
-                # Update analytics
-                for det in detections:
-                    analytics.add_detection(det)
-                    if config.enable_mobile_api and mobile_api_instance is not None:
-                        mobile_api_instance.add_detection(det)
-                
-                # Check for alerts
-                alert_system.check_and_alert(detections)
-                
-                # Update web interface if enabled
-                if config.enable_web_interface and web_interface is not None:
-                    web_interface.update_frame(frame, detections)
-                
-                # Record frame if enabled
-                if config.enable_recording and writer:
-                    writer.write(frame)
-            
-            # Calculate and display FPS
-            elapsed_time = time.time() - start_time
-            current_fps = frame_idx / elapsed_time
-            cv2.putText(frame, f"FPS: {current_fps:.1f}", (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.putText(frame, f"Detections: {detection_count}", (10, 70),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            if config.video_path and total_frames > 0:
-                progress = (frame_idx / total_frames) * 100
-                cv2.putText(frame, f"Progress: {progress:.1f}%", (10, 110),
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            
-            # Display frame
-            cv2.imshow("YOLOv9 Detection", frame)
-            
-            # Check for quit command
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                logging.info("Quit command received")
-                break
-                
-    finally:
-        # Cleanup
-        logging.info("Cleaning up resources")
+def cleanup_resources():
+    """Safely release camera and other resources"""
+    global cap
+    stop_event.set()
+    if cap is not None:
         cap.release()
-        if writer:
-            writer.release()
-        cv2.destroyAllWindows()
-        
-        # Stop web interface if it's running
-        if config.enable_web_interface and web_interface is not None:
-            web_interface.stop()
-            if web_thread and web_thread.is_alive():
-                web_thread.join(timeout=1)
-            
-        # Generate final reports
-        logging.info("Generating final reports")
-        analytics.generate_daily_report()
-        analytics.generate_weekly_report()
-        
-        # Log final statistics
-        total_time = time.time() - start_time
-        logging.info(f"Processing completed:")
-        logging.info(f"- Total frames processed: {frame_idx}")
-        logging.info(f"- Total detections: {detection_count}")
-        logging.info(f"- Average FPS: {frame_idx/total_time:.2f}")
-        logging.info(f"- Total processing time: {total_time:.2f} seconds")
+        cap = None
 
-if __name__ == "__main__":
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Run YOLOv9 object detection")
-    parser.add_argument("--video", type=str, help="Path to video file (optional)")
-    parser.add_argument("--webcam", action="store_true", help="Use webcam instead of video file")
-    args = parser.parse_args()
+def detection_loop():
+    """Main detection thread that processes frames and detects wildlife"""
+    global current_frame, cap, detection_results
     
-    # Create configuration with default settings
-    config = DetectionConfig(
-        weights_path="./weights/yolov9-t.onnx",
-        classes_path="./weights/metadata.yaml",
-        device="cpu",
-        enable_web_interface=True,
-        web_port=5000,
-        web_host="0.0.0.0",  # Changed to 0.0.0.0 to allow all connections
-        enable_mobile_api=True,
-        mobile_api_port=5000,
-        enable_analytics=True,
-        enable_recording=True,
-        enable_alerts=True,
-        alert_email="maheshmahendrakar@kgr.ac.in",
-        alert_confidence_threshold=0.5,
-        location="Default Location"
-    )
+    while not stop_event.is_set():
+        try:
+            # Frame acquisition based on source
+            if current_source == 'webcam':
+                if cap is None or not cap.isOpened():
+                    cap = cv2.VideoCapture(0)
+                    if not cap.isOpened():
+                        # Handle webcam failure - create error frame
+                        error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                        cv2.putText(error_frame, "Cannot access webcam", (50, 240), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        with frame_lock:
+                            current_frame = error_frame
+                        time.sleep(1)  # Avoid busy waiting
+                        continue
+                
+                ret, frame = cap.read()
+                if not ret:
+                    continue
+                    
+            elif current_source == 'video' and video_path:
+                if cap is None or not cap.isOpened():
+                    cap = cv2.VideoCapture(video_path)
+                    if not cap.isOpened():
+                        # Handle video failure
+                        error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                        cv2.putText(error_frame, "Cannot open video file", (50, 240), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        with frame_lock:
+                            current_frame = error_frame
+                        time.sleep(1)
+                        continue
+                
+                ret, frame = cap.read()
+                if not ret:
+                    # Loop the video when it ends
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    continue
+            else:
+                # No source selected or initialization frame
+                frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(frame, "Select video source", (50, 240), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            
+            # Perform detection if source is active
+            if current_source:
+                detections = detector.detect(frame)
+                
+                # Check for new detections and send alerts if needed
+                if detections and user_email:
+                    for detection in detections:
+                        if detection['confidence'] > 0.7:  # High confidence threshold for alerts
+                            alert_system.send_alert(
+                                user_email, 
+                                f"Wildlife Detected: {detection['species']}",
+                                frame
+                            )
+                
+                # Update detection history - limit to most recent 20 entries
+                for detection in detections:
+                    detection_results.append({
+                        'species': detection['species'],
+                        'confidence': detection['confidence'],
+                        'timestamp': time.time() * 1000  # Milliseconds timestamp
+                    })
+                detection_results = detection_results[-20:]
+                
+                # Draw bounding boxes and labels
+                frame = detector.draw_detections(frame, detections)
+            
+            # Update shared frame with thread safety
+            with frame_lock:
+                current_frame = frame.copy()
+                
+            # Avoid high CPU usage
+            time.sleep(0.03)  # ~30 FPS max
+            
+        except Exception as e:
+            print(f"Error in detection loop: {e}")
+            time.sleep(1)  # Prevent rapid error loops
+
+@app.route('/')
+def index():
+    """Render the main page"""
+    return render_template('index.html')
+
+@app.route('/video_feed')
+def video_feed():
+    """Stream video frames as MJPEG"""
+    def generate():
+        while True:
+            with frame_lock:
+                if current_frame is not None:
+                    ret, buffer = cv2.imencode('.jpg', current_frame)
+                    if not ret:
+                        continue
+                    frame = buffer.tobytes()
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            time.sleep(0.03)  # Control streaming rate
     
-    # Override video path if provided
-    if args.video:
-        config.video_path = args.video
-    elif args.webcam:
-        config.video_path = None  # Will use webcam
-    else:
-        config.video_path = None  # Default to webcam
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/set_source', methods=['POST'])
+def set_source():
+    """Handle changing the video source"""
+    global current_source, cap, video_path
     
-    # Setup logging
-    setup_logging(config)
+    data = request.json
+    new_source = data.get('source')
     
-    # Process video/webcam
-    process_video(config)
+    # Clean up previous source
+    if cap:
+        cap.release()
+        cap = None
+    
+    # Set new source
+    if new_source in ['webcam', 'video']:
+        current_source = new_source
+        
+        # Get video path if provided
+        if new_source == 'video':
+            video_path = data.get('video_path')
+            
+        return jsonify({'success': True})
+    
+    return jsonify({'success': False, 'error': 'Invalid source type'})
+
+@app.route('/set_email', methods=['POST'])
+def set_email():
+    """Save user email for alerts"""
+    global user_email
+    
+    data = request.json
+    email = data.get('email')
+    
+    if email and '@' in email:
+        user_email = email
+        return jsonify({'success': True})
+    
+    return jsonify({'success': False, 'error': 'Invalid email format'})
+
+@app.route('/detections', methods=['GET'])
+def get_detections():
+    """Return recent detections as JSON"""
+    return jsonify({'detections': detection_results})
+
+@app.errorhandler(Exception)
+def handle_error(e):
+    """Global error handler"""
+    return jsonify({'success': False, 'error': str(e)}), 500
+
+if __name__ == '__main__':
+    try:
+        # Start detection thread
+        detection_thread = threading.Thread(target=detection_loop)
+        detection_thread.daemon = True
+        detection_thread.start()
+        
+        # Run the Flask app
+        app.run(host='0.0.0.0', port=5000, threaded=True)
+    finally:
+        # Ensure cleanup happens when app exits
+        cleanup_resources()

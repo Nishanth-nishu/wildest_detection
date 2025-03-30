@@ -3,828 +3,408 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wildlife Detection System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@latest/css/boxicons.min.css">
-    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <title>Wildlife Detection</title>
+    <link rel="stylesheet" href="/static/css/style.css">
     <style>
         :root {
-            --primary: #4361ee;
-            --secondary: #3f37c9;
-            --success: #4cc9f0;
-            --info: #4895ef;
-            --warning: #f72585;
-            --danger: #e63946;
-            --light: #f8f9fa;
-            --dark: #212529;
+            --primary-color: #2e7d32;
+            --secondary-color: #a5d6a7;
+            --dark-color: #1b5e20;
+            --light-color: #f1f8e9;
+            --accent-color: #ff6f00;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-       
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f6f8fa;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-color);
             color: #333;
         }
-       
-        .sidebar {
-            background-color: var(--dark);
-            min-height: 100vh;
-            color: white;
-            transition: all 0.3s;
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
         }
-       
-        .sidebar .logo {
-            padding: 20px 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-       
-        .sidebar .nav-link {
-            color: rgba(255, 255, 255, 0.75);
-            border-radius: 4px;
-            margin: 6px 10px;
-            transition: all 0.3s;
-        }
-       
-        .sidebar .nav-link:hover, .sidebar .nav-link.active {
-            color: white;
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-       
-        .sidebar .nav-link i {
-            margin-right: 10px;
-        }
-       
-        .main-content {
-            transition: all 0.3s;
-        }
-       
-        .card {
-            border-radius: 10px;
-            border: none;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            margin-bottom: 20px;
-            overflow: hidden;
-        }
-       
-        .card-header {
-            background-color: white;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-            font-weight: 600;
-        }
-       
-        .video-container {
-            position: relative;
-            border-radius: 10px;
-            overflow: hidden;
-            background-color: #000;
-        }
-       
-        .video-feed {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-       
-        .controls {
-            padding: 15px;
-            background-color: rgba(0, 0, 0, 0.5);
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
+        
+        header {
             display: flex;
-            justify-content: center;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        header h1 {
+            color: var(--primary-color);
+            margin: 0;
+            font-size: 2.2rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        header h1 svg {
+            margin-right: 15px;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 25px;
+        }
+        
+        .video-panel {
+            background: white;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        
+        .source-controls {
+            background: var(--primary-color);
+            padding: 15px;
+            display: flex;
             gap: 10px;
         }
-       
-        .detection-item {
-            border-left: 4px solid var(--primary);
-            padding: 10px 15px;
-            margin-bottom: 10px;
-            background-color: white;
-            border-radius: 4px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s;
-        }
-       
-        .detection-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-       
-        .detection-item.person {
-            border-color: var(--primary);
-        }
-       
-        .detection-item.car {
-            border-color: var(--info);
-        }
-       
-        .detection-item.dog {
-            border-color: var(--warning);
-        }
-       
-        .stat-card {
-            padding: 15px;
-            border-radius: 10px;
+        
+        .source-controls button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
             color: white;
-            height: 100%;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .source-controls button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .source-controls button.active {
+            background: white;
+            color: var(--primary-color);
+        }
+        
+        .video-container {
+            position: relative;
+            overflow: hidden;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f5f5;
+        }
+        
+        .video-container img {
+            max-width: 100%;
+            display: block;
+        }
+        
+        .sidebar {
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            gap: 25px;
         }
-       
-        .stat-card.primary {
-            background: linear-gradient(45deg, var(--primary), var(--info));
-        }
-       
-        .stat-card.secondary {
-            background: linear-gradient(45deg, var(--secondary), var(--primary));
-        }
-       
-        .stat-card.success {
-            background: linear-gradient(45deg, var(--info), var(--success));
-        }
-       
-        .stat-card.warning {
-            background: linear-gradient(45deg, var(--warning), var(--danger));
-        }
-       
-        .stat-card .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-        }
-       
-        .stat-card .stat-label {
-            font-size: 0.9rem;
-            opacity: 0.8;
-        }
-       
-        .tab-pane {
-            padding: 20px 0;
-        }
-       
-        .settings-form label {
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-       
-        .image-gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
-        }
-       
-        .gallery-item {
-            border-radius: 8px;
+        
+        .panel {
+            background: white;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
             overflow: hidden;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s;
         }
-       
-        .gallery-item:hover {
-            transform: scale(1.03);
+        
+        .panel-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 15px;
+            font-size: 1.1rem;
+            font-weight: 500;
         }
-       
-        .gallery-item img {
-            width: 100%;
-            height: 150px;
-            object-fit: cover;
+        
+        .panel-body {
+            padding: 15px;
         }
-       
-        .gallery-item .gallery-info {
+        
+        .alert-config {
+            margin-bottom: 15px;
+        }
+        
+        .alert-config label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .email-input-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .email-input-group input {
+            flex: 1;
             padding: 10px;
-            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
         }
-       
+        
+        .email-input-group button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .email-input-group button:hover {
+            background: var(--dark-color);
+        }
+        
+        .detection-list {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        
+        .detection-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        
+        .detection-item:hover {
+            background: #f9f9f9;
+        }
+        
+        .detection-item:last-child {
+            border-bottom: none;
+        }
+        
+        .species {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .confidence {
+            background: var(--secondary-color);
+            color: var(--dark-color);
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4caf50;
+        }
+        
+        .timestamp {
+            color: #777;
+            font-size: 0.8rem;
+        }
+        
         @media (max-width: 768px) {
-            .sidebar {
-                position: fixed;
-                z-index: 999;
-                width: 250px;
-                left: -250px;
+            .dashboard {
+                grid-template-columns: 1fr;
             }
-           
-            .sidebar.active {
-                left: 0;
+            
+            header {
+                flex-direction: column;
+                align-items: flex-start;
             }
-           
-            .toggle-sidebar {
-                position: fixed;
-                top: 15px;
-                left: 15px;
-                z-index: 1000;
+            
+            header h1 {
+                margin-bottom: 15px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-                <div class="position-sticky">
-                    <div class="logo">
-                        <h4>YOLOv9 Detection</h4>
-                    </div>
-                    <ul class="nav flex-column mt-4">
-                        <li class="nav-item">
-                            <a class="nav-link active" href="#dashboard" data-bs-toggle="tab">
-                                <i class='bx bxs-dashboard'></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#detections" data-bs-toggle="tab">
-                                <i class='bx bxs-bell'></i> Detections
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#analytics" data-bs-toggle="tab">
-                                <i class='bx bxs-bar-chart-alt-2'></i> Analytics
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#snapshots" data-bs-toggle="tab">
-                                <i class='bx bxs-camera'></i> Snapshots
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#recordings" data-bs-toggle="tab">
-                                <i class='bx bxs-video'></i> Recordings
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#settings" data-bs-toggle="tab">
-                                <i class='bx bxs-cog'></i> Settings
-                            </a>
-                        </li>
-                    </ul>
+    <div class="container">
+        <header>
+            <h1>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 3l-4 4-4-4-4 4v9l4-4 4 4 4-4V3z"></path>
+                    <path d="M12 12l0 9"></path>
+                </svg>
+                Wildlife Detection System
+            </h1>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span>System active and monitoring</span>
+            </div>
+        </header>
+        
+        <div class="dashboard">
+            <div class="video-panel">
+                <div class="source-controls">
+                    <button id="webcam-btn" class="active">Live Camera Feed</button>
+                    <button id="upload-btn">Upload Video</button>
+                    <input type="file" id="video-upload" accept="video/*" style="display:none">
+                </div>
+                <div class="video-container">
+                    <img id="video-feed" src="{{ url_for('video_feed') }}">
                 </div>
             </div>
-           
-            <!-- Mobile toggle -->
-            <button class="btn btn-primary d-md-none toggle-sidebar">
-                <i class='bx bx-menu'></i>
-            </button>
-           
-            <!-- Main content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-                <div class="tab-content">
-                    <!-- Dashboard -->
-                    <div class="tab-pane active" id="dashboard">
-                        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                            <h1 class="h2">Dashboard</h1>
-                            <div class="btn-toolbar mb-2 mb-md-0">
-                                <div class="btn-group me-2">
-                                    <button type="button" class="btn btn-sm btn-outline-primary" id="takeSnapshot">
-                                        <i class='bx bxs-camera'></i> Take Snapshot
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" id="toggleRecording">
-                                        <i class='bx bxs-video-recording'></i> Start Recording
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                       
-                        <div class="row">
-                            <div class="col-md-8">
-                                <!-- Video Feed -->
-                                <div class="card">
-                                    <div class="card-header d-flex justify-content-between align-items-center">
-                                        <span>Live Feed</span>
-                                        <span class="badge bg-success" id="connectionStatus">Connected</span>
-                                    </div>
-                                    <div class="card-body p-0">
-                                        <div class="video-container">
-                                            <img src="/video_feed" class="video-feed" id="videoFeed" alt="Video Feed">
-                                            <div class="controls">
-                                                <button class="btn btn-sm btn-light" id="zoomIn">
-                                                    <i class='bx bx-zoom-in'></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-light" id="zoomOut">
-                                                    <i class='bx bx-zoom-out'></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-light" id="fullscreen">
-                                                    <i class='bx bx-fullscreen'></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                           
-                            <div class="col-md-4">
-                                <!-- Stats Cards -->
-                                <div class="row">
-                                    <div class="col-6 mb-3">
-                                        <div class="stat-card primary">
-                                            <div class="stat-label">Total Detections</div>
-                                            <div class="stat-value" id="totalDetections">0</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 mb-3">
-                                        <div class="stat-card secondary">
-                                            <div class="stat-label">FPS</div>
-                                            <div class="stat-value" id="currentFps">0</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 mb-3">
-                                        <div class="stat-card success">
-                                            <div class="stat-label">CPU Usage</div>
-                                            <div class="stat-value" id="cpuUsage">0%</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 mb-3">
-                                        <div class="stat-card warning">
-                                            <div class="stat-label">Temperature</div>
-                                            <div class="stat-value" id="temperature">0°C</div>
-                                        </div>
-                                    </div>
-                                </div>
-                               
-                                <!-- Recent Detections -->
-                                <div class="card">
-                                    <div class="card-header">Recent Detections</div>
-                                    <div class="card-body p-2">
-                                        <div class="recent-detections" id="recentDetections">
-                                            <!-- Detection items will be populated by JavaScript -->
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                       
-                        <!-- Detection Chart -->
-                        <div class="card mt-4">
-                            <div class="card-header">Detection Activity (24 hours)</div>
-                            <div class="card-body">
-                                <canvas id="detectionChart" height="200"></canvas>
-                            </div>
-                        </div>
+            
+            <div class="sidebar">
+                <div class="panel">
+                    <div class="panel-header">
+                        Email Alerts
                     </div>
-                   
-                    <!-- Detections Tab -->
-                    <div class="tab-pane" id="detections">
-                        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                            <h1 class="h2">Detections</h1>
-                            <div class="btn-toolbar mb-2 mb-md-0">
-                                <div class="btn-group me-2">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="exportDetections">
-                                        <i class='bx bx-export'></i> Export
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" id="clearDetections">
-                                        <i class='bx bx-trash'></i> Clear
-                                    </button>
-                                </div>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class='bx bx-filter'></i> Filter
-                                    </button>
-                                    <ul class="dropdown-menu" aria-labelledby="filterDropdown">
-                                        <li><a class="dropdown-item" href="#" data-filter="all">All</a></li>
-                                        <li><a class="dropdown-item" href="#" data-filter="person">Person</a></li>
-                                        <li><a class="dropdown-item" href="#" data-filter="car">Car</a></li>
-                                        <li><a class="dropdown-item" href="#" data-filter="dog">Dog</a></li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                       
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Time</th>
-                                                <th>Class</th>
-                                                <th>Confidence</th>
-                                                <th>Location</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="detectionsTable">
-                                            <!-- Will be populated by JavaScript -->
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                   
-                    <!-- Analytics Tab -->
-                    <div class="tab-pane" id="analytics">
-                        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                            <h1 class="h2">Analytics</h1>
-                            <div class="btn-toolbar mb-2 mb-md-0">
-                                <div class="btn-group me-2">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="generateReport">
-                                        <i class='bx bx-file'></i> Generate Report
-                                    </button>
-                                </div>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="timerangeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class='bx bx-calendar'></i> Last 24 hours
-                                    </button>
-                                    <ul class="dropdown-menu" aria-labelledby="timerangeDropdown">
-                                        <li><a class="dropdown-item" href="#" data-range="24h">Last 24 hours</a></li>
-                                        <li><a class="dropdown-item" href="#" data-range="7d">Last 7 days</a></li>
-                                        <li><a class="dropdown-item" href="#" data-range="30d">Last 30 days</a></li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                       
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        Detections by Class
-                                    </div>
-                                    <div class="card-body">
-                                        <canvas id="classChart" height="300"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        Detections by Time
-                                    </div>
-                                    <div class="card-body">
-                                        <canvas id="timeChart" height="300"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                       
-                        <div class="card mt-4">
-                            <div class="card-header">
-                                Detection Heatmap
-                            </div>
-                            <div class="card-body">
-                                <canvas id="heatmapChart" height="200"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                   
-                    <!-- Snapshots Tab -->
-                    <div class="tab-pane" id="snapshots">
-                        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                            <h1 class="h2">Snapshots</h1>
-                            <div class="btn-toolbar mb-2 mb-md-0">
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="takeSnapshotBtn">
-                                    <i class='bx bxs-camera'></i> Take New Snapshot
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger ms-2" id="deleteAllSnapshotsBtn">
-                                    <i class='bx bxs-trash'></i> Delete All
-                                </button>
-                            </div>
-                        </div>
-                       
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="image-gallery" id="snapshotsGallery">
-                                    <!-- Will be populated by JavaScript -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                   
-                    <!-- Recordings Tab -->
-                    <div class="tab-pane" id="recordings">
-                        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                            <h1 class="h2">Recordings</h1>
-                            <div class="btn-toolbar mb-2 mb-md-0">
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="startRecordingBtn">
-                                    <i class='bx bxs-video-recording'></i> Start Recording
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger ms-2" id="deleteAllRecordingsBtn">
-                                    <i class='bx bxs-trash'></i> Delete All
-                                </button>
-                            </div>
-                        </div>
-                       
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="row mb-4" id="recordingsContainer">
-                                    <!-- Will be populated by JavaScript -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                   
-                    <!-- Settings Tab -->
-                    <div class="tab-pane" id="settings">
-                        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                            <h1 class="h2">Settings</h1>
-                            <div class="btn-toolbar mb-2 mb-md-0">
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="saveSettingsBtn">
-                                    <i class='bx bxs-save'></i> Save Settings
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="resetSettingsBtn">
-                                    <i class='bx bxs-reset'></i> Reset to Default
-                                </button>
-                            </div>
-                        </div>
-                       
-                        <div class="card">
-                            <div class="card-body">
-                                <ul class="nav nav-tabs" id="settingsTabs" role="tablist">
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link active" id="camera-tab" data-bs-toggle="tab" data-bs-target="#camera-settings" type="button" role="tab" aria-controls="camera-settings" aria-selected="true">Camera</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="detection-tab" data-bs-toggle="tab" data-bs-target="#detection-settings" type="button" role="tab" aria-controls="detection-settings" aria-selected="false">Detection</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="alert-tab" data-bs-toggle="tab" data-bs-target="#alert-settings" type="button" role="tab" aria-controls="alert-settings" aria-selected="false">Alerts</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="recording-tab" data-bs-toggle="tab" data-bs-target="#recording-settings" type="button" role="tab" aria-controls="recording-settings" aria-selected="false">Recording</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system-settings" type="button" role="tab" aria-controls="system-settings" aria-selected="false">System</button>
-                                    </li>
-                                </ul>
-                                <div class="tab-content pt-3" id="settingsTabContent">
-                                    <!-- Camera Settings -->
-                                    <div class="tab-pane fade show active" id="camera-settings" role="tabpanel" aria-labelledby="camera-tab">
-                                        <form class="settings-form">
-                                            <div class="row mb-3">
-                                                <div class="col-md-6">
-                                                    <label for="cameraResolution" class="form-label">Resolution</label>
-                                                    <select class="form-select" id="cameraResolution">
-                                                        <option value="640x480">640x480</option>
-                                                        <option value="1280x720">1280x720 (HD)</option>
-                                                        <option value="1920x1080">1920x1080 (Full HD)</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label for="cameraFps" class="form-label">Frame Rate (FPS)</label>
-                                                    <select class="form-select" id="cameraFps">
-                                                        <option value="15">15</option>
-                                                        <option value="30" selected>30</option>
-                                                        <option value="60">60</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col-md-6">
-                                                    <label for="cameraBrightness" class="form-label">Brightness</label>
-                                                    <input type="range" class="form-range" min="0" max="100" step="1" id="cameraBrightness" value="50">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label for="cameraContrast" class="form-label">Contrast</label>
-                                                    <input type="range" class="form-range" min="0" max="100" step="1" id="cameraContrast" value="50">
-                                                </div>
-                                            </div>
-                                        </form>
-                                    </div>
-                                   
-                                    <!-- Detection Settings -->
-                                    <div class="tab-pane fade" id="detection-settings" role="tabpanel" aria-labelledby="detection-tab">
-                                        <form class="settings-form">
-                                            <div class="row mb-3">
-                                                <div class="col-md-6">
-                                                    <label for="confidenceThreshold" class="form-label">Confidence Threshold</label>
-                                                    <input type="range" class="form-range" min="0" max="1" step="0.01" id="confidenceThreshold" value="0.5">
-                                                    <div class="text-center" id="confidenceValue">0.5</div>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label for="iouThreshold" class="form-label">IoU Threshold</label>
-                                                    <input type="range" class="form-range" min="0" max="1" step="0.01" id="iouThreshold" value="0.4">
-                                                    <div class="text-center" id="iouValue">0.4</div>
-                                                </div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label">Classes to Detect</label>
-                                                <div class="row">
-                                                    <div class="col-md-4">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" value="person" id="personCheck" checked>
-                                                            <label class="form-check-label" for="personCheck">
-                                                                Person
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" value="car" id="carCheck" checked>
-                                                            <label class="form-check-label" for="carCheck">
-                                                                Car
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" value="dog" id="dogCheck" checked>
-                                                            <label class="form-check-label" for="dogCheck">
-                                                                Dog
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </form>
-                                    </div>
-                                   
-                                    <!-- Alert Settings -->
-                                    <div class="tab-pane fade" id="alert-settings" role="tabpanel" aria-labelledby="alert-tab">
-                                        <form class="settings-form">
-                                            <div class="form-check form-switch mb-3">
-                                                <input class="form-check-input" type="checkbox" id="enableAlerts" checked>
-                                                <label class="form-check-label" for="enableAlerts">Enable Alerts</label>
-                                            </div>
-                                           
-                                            <div class="mb-3">
-                                                <label for="alertEmail" class="form-label">Email for Notifications</label>
-                                                <input type="email" class="form-control" id="alertEmail" value="">
-                                            </div>
-                                           
-                                            <div class="mb-3">
-                                                <label for="alertConfidenceThreshold" class="form-label">Alert Confidence Threshold</label>
-                                                <input type="range" class="form-range" min="0" max="1" step="0.01" id="alertConfidenceThreshold" value="0.5">
-                                                <div class="text-center" id="alertConfidenceValue">0.5</div>
-                                            </div>
-                                           
-                                            <div class="mb-3">
-                                                <label class="form-label">Classes to Alert On</label>
-                                                <div class="row">
-                                                    <div class="col-md-4">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" value="person" id="alertPersonCheck" checked>
-                                                            <label class="form-check-label" for="alertPersonCheck">
-                                                                Person
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" value="car" id="alertCarCheck" checked>
-                                                            <label class="form-check-label" for="alertCarCheck">
-                                                                Car
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" value="dog" id="alertDogCheck" checked>
-                                                            <label class="form-check-label" for="alertDogCheck">
-                                                                Dog
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                           
-                                            <div class="mb-3">
-                                                <label for="alertCooldown" class="form-label">Alert Cooldown Period (seconds)</label>
-                                                <input type="number" class="form-control" id="alertCooldown" value="60" min="0">
-                                            </div>
-                                        </form>
-                                    </div>
-                                   
-                                    <!-- Recording Settings -->
-                                    <div class="tab-pane fade" id="recording-settings" role="tabpanel" aria-labelledby="recording-tab">
-                                        <form class="settings-form">
-                                            <div class="form-check form-switch mb-3">
-                                                <input class="form-check-input" type="checkbox" id="enableRecording" checked>
-                                                <label class="form-check-label" for="enableRecording">Enable Recording</label>
-                                            </div>
-                                           
-                                            <div class="mb-3">
-                                                <label class="form-label">Recording Mode</label>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" name="recordingMode" id="continuousMode" value="continuous">
-                                                    <label class="form-check-label" for="continuousMode">
-                                                        Continuous Recording
-                                                    </label>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" name="recordingMode" id="motionMode" value="motion" checked>
-                                                    <label class="form-check-label" for="motionMode">
-                                                        Motion-Activated Recording
-                                                    </label>
-                                                </div>
-                                            </div>
-                                           
-                                            <div class="row mb-3">
-                                                <div class="col-md-6">
-                                                    <label for="preRecordSeconds" class="form-label">Pre-Record Buffer (seconds)</label>
-                                                    <input type="number" class="form-control" id="preRecordSeconds" value="5" min="0">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label for="postRecordSeconds" class="form-label">Post-Record Buffer (seconds)</label>
-                                                    <input type="number" class="form-control" id="postRecordSeconds" value="10" min="0">
-                                                </div>
-                                            </div>
-                                           
-                                            <div class="mb-3">
-                                                <label for="maxRecordingDuration" class="form-label">Maximum Recording Duration (seconds)</label>
-                                                <input type="number" class="form-control" id="maxRecordingDuration" value="300" min="10">
-                                            </div>
-                                        </form>
-                                    </div>
-                                   
-                                    <!-- System Settings -->
-                                    <div class="tab-pane fade" id="system-settings" role="tabpanel" aria-labelledby="system-tab">
-                                        <form class="settings-form">
-                                            <div class="mb-3">
-                                                <label for="systemLocation" class="form-label">Location Name</label>
-                                                <input type="text" class="form-control" id="systemLocation" value="Default Location">
-                                            </div>
-                                           
-                                            <div class="mb-3">
-                                                <label for="logLevel" class="form-label">Log Level</label>
-                                                <select class="form-select" id="logLevel">
-                                                    <option value="DEBUG">Debug</option>
-                                                    <option value="INFO" selected>Info</option>
-                                                    <option value="WARNING">Warning</option>
-                                                    <option value="ERROR">Error</option>
-                                                </select>
-                                            </div>
-                                           
-                                            <div class="form-check form-switch mb-3">
-                                                <input class="form-check-input" type="checkbox" id="enableAnalytics" checked>
-                                                <label class="form-check-label" for="enableAnalytics">Enable Analytics</label>
-                                            </div>
-                                           
-                                            <div class="form-check form-switch mb-3">
-                                                <input class="form-check-input" type="checkbox" id="enableMobileApi" checked>
-                                                <label class="form-check-label" for="enableMobileApi">Enable Mobile API</label>
-                                            </div>
-                                           
-                                            <div class="mb-3">
-                                                <button type="button" class="btn btn-outline-warning" id="clearCacheBtn">
-                                                    Clear Cache
-                                                </button>
-                                                <button type="button" class="btn btn-outline-danger ms-2" id="restartSystemBtn">
-                                                    Restart System
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
+                    <div class="panel-body">
+                        <div class="alert-config">
+                            <label for="email-input">Receive alerts when wildlife is detected:</label>
+                            <div class="email-input-group">
+                                <input type="email" id="email-input" placeholder="Your email">
+                                <button id="save-email">Save</button>
                             </div>
                         </div>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
-   
-    <!-- Modal for viewing snapshots -->
-    <div class="modal fade" id="snapshotModal" tabindex="-1" aria-labelledby="snapshotModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="snapshotModalLabel">Snapshot</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <img src="" id="modalImage" class="img-fluid" alt="Snapshot">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-primary" id="downloadSnapshotBtn">
-                        <i class='bx bx-download'></i> Download
-                    </button>
-                    <button type="button" class="btn btn-outline-danger" id="deleteSnapshotBtn">
-                        <i class='bx bx-trash'></i> Delete
-                    </button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                
+                <div class="panel">
+                    <div class="panel-header">
+                        Recent Detections
+                    </div>
+                    <div class="panel-body">
+                        <div id="detection-list" class="detection-list">
+                            <!-- Dynamic content will appear here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-   
-    <!-- Modal for viewing recordings -->
-    <div class="modal fade" id="recordingModal" tabindex="-1" aria-labelledby="recordingModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="recordingModalLabel">Recording</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <video id="modalVideo" class="w-100" controls></video>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-primary" id="downloadRecordingBtn">
-                        <i class='bx bx-download'></i> Download
-                    </button>
-                    <button type="button" class="btn btn-outline-danger" id="deleteRecordingBtn">
-                        <i class='bx bx-trash'></i> Delete
-                    </button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-   
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
-        // Will be replaced with actual JavaScript in the next artifact
+        document.addEventListener('DOMContentLoaded', () => {
+            const webcamBtn = document.getElementById('webcam-btn');
+            const uploadBtn = document.getElementById('upload-btn');
+            const videoUpload = document.getElementById('video-upload');
+            const emailInput = document.getElementById('email-input');
+            const saveEmailBtn = document.getElementById('save-email');
+            
+            // Source selection
+            webcamBtn.addEventListener('click', () => {
+                setSource('webcam');
+                webcamBtn.classList.add('active');
+                uploadBtn.classList.remove('active');
+            });
+            
+            uploadBtn.addEventListener('click', () => {
+                videoUpload.click();
+            });
+            
+            videoUpload.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    setSource('video');
+                    uploadBtn.classList.add('active');
+                    webcamBtn.classList.remove('active');
+                    
+                    // Show selected filename
+                    const fileName = e.target.files[0].name;
+                    uploadBtn.textContent = `Video: ${fileName.substring(0, 15)}${fileName.length > 15 ? '...' : ''}`;
+                }
+            });
+            
+            function setSource(source) {
+                fetch('/set_source', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ source })
+                }).then(response => {
+                    if (!response.ok) {
+                        alert('Failed to switch source');
+                    }
+                });
+            }
+            
+            // Email configuration
+            saveEmailBtn.addEventListener('click', () => {
+                const email = emailInput.value.trim();
+                if (email.includes('@')) {
+                    fetch('/set_email', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ email })
+                    }).then(response => {
+                        if (response.ok) {
+                            showNotification('Email saved for alerts!');
+                        }
+                    });
+                } else {
+                    showNotification('Please enter a valid email', 'error');
+                }
+            });
+            
+            function showNotification(message, type = 'success') {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 500);
+                }, 3000);
+            }
+            
+            // Periodically update detection list
+            setInterval(() => {
+                fetch('/detections').then(r => r.json()).then(data => {
+                    const list = document.getElementById('detection-list');
+                    list.innerHTML = data.detections.map(d => {
+                        const date = new Date(d.timestamp);
+                        const formattedTime = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        
+                        return `
+                            <div class="detection-item">
+                                <div class="species">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M17 3l-4 4-4-4-4 4v9l4-4 4 4 4-4V3z"></path>
+                                    </svg>
+                                    ${d.species}
+                                </div>
+                                <div class="detection-meta">
+                                    <span class="confidence">${(d.confidence * 100).toFixed(1)}%</span>
+                                    <div class="timestamp">${formattedTime}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    if (data.detections.length === 0) {
+                        list.innerHTML = '<div class="detection-item">No wildlife detected yet</div>';
+                    }
+                });
+            }, 1000);
+        });
     </script>
 </body>
 </html>
